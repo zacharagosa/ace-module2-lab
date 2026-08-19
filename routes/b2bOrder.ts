@@ -13,11 +13,68 @@ import { challenges } from '../data/datacache'
 import * as security from '../lib/insecurity'
 import * as utils from '../lib/utils'
 
+function isMalicious (code: any): boolean {
+  if (typeof code !== 'string') {
+    return false
+  }
+  const lower = code.toLowerCase()
+  const forbiddenKeywords = [
+    'constructor',
+    'prototype',
+    '__proto__',
+    'process',
+    'require',
+    'exec',
+    'spawn',
+    'fork',
+    'function',
+    'eval',
+    'global',
+    'this',
+    'window',
+    'document',
+    'reflect',
+    'proxy',
+    'object',
+    'string',
+    'array',
+    'fromcharcode',
+    'fromcodepoint',
+    'atob',
+    'btoa',
+    'unescape',
+    'escape',
+    'decode',
+    'encode',
+    'arguments',
+    'mainmodule',
+    'concat',
+    'join',
+    'reduce',
+    'regexp'
+  ]
+
+  if (lower.includes('\\') || lower.includes('`') || lower.includes('+')) {
+    return true
+  }
+
+  for (const keyword of forbiddenKeywords) {
+    if (lower.includes(keyword)) {
+      return true
+    }
+  }
+
+  return false
+}
+
 export function b2bOrder () {
   return ({ body }: Request, res: Response, next: NextFunction) => {
     if (utils.isChallengeEnabled(challenges.rceChallenge) || utils.isChallengeEnabled(challenges.rceOccupyChallenge)) {
       const orderLinesData = body.orderLinesData || ''
       try {
+        if (isMalicious(orderLinesData)) {
+          throw new Error('Blocked dangerous input')
+        }
         const sandbox = { safeEval, orderLinesData }
         vm.createContext(sandbox)
         vm.runInContext('safeEval(orderLinesData)', sandbox, { timeout: 2000 })
